@@ -1,0 +1,12 @@
+pandas
+numpy
+pytest
+scikit-learn
+joblib
+fastapi
+httpx
+uvicorn
+requests
+psycopg2-binary
+testcontainers[postgres]
+pyspark>=4.0

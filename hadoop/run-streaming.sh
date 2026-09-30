@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Runs the MapReduce job with Hadoop Streaming (local job runner, single container).
+# apache/hadoop:3.4.1 publishes amd64 only -> on Apple Silicon it runs under emulation.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+DATA=${1:-data/receipts.csv}
+mkdir -p data
+rm -rf data/hadoop-out
+docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work apache/hadoop:3.4.1 bash -c '
+  set -e
+  JAR=$(ls /opt/hadoop/share/hadoop/tools/lib/hadoop-streaming-*.jar)
+  hadoop jar "$JAR" -D mapreduce.framework.name=local -D fs.defaultFS=file:/// \
+    -files hadoop/mapper.awk,hadoop/reducer.awk -mapper "awk -f mapper.awk" -reducer "awk -f reducer.awk" \
+    -input '"$DATA"' -output data/hadoop-out'
+cat data/hadoop-out/part-*
