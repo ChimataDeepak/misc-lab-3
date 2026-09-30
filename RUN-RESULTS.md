@@ -20,3 +20,8 @@ All data is synthetic.
 Not run: GitHub Actions (branch is not pushed). Airflow was verified with `airflow dags test`
 (runs real tasks in-process) rather than a long-running scheduler + webserver.
 Hadoop ran in a single container with the local job runner, not a multi-node HDFS/YARN cluster.
+
+## Independent re-verification (2026-09-30)
+Re-ran everything: ETL 6 passed (alone; 2 Testcontainers setup errors when run inside the full suite under load, pass on rerun), Spark/ML/RAG-stub/Hadoop-local passed,
+Airflow DagBag 4 passed + 2x `dags test` success with 115 rows, Hadoop Streaming counts identical, ML metrics identical,
+real Ollama test 1 passed (failed once with an HTTP error on a cold model, passed on rerun).
