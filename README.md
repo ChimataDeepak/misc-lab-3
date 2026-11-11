@@ -16,6 +16,32 @@ generate.py ──► ETL (validate, dedupe, FX→INR) ──► PostgreSQL ◄�
 
 Run everything: `./run-all.sh` (or `make all`). Results of the last run: [RUN-RESULTS.md](RUN-RESULTS.md).
 
+## How to read this code
+
+Reading order (follow the data: generated → cleaned → loaded → analysed → scored → asked about):
+
+1. `run-all.sh` — entry point: builds the venv, generates data, then runs pytest, the Airflow tests, the Hadoop job and model training in order.
+2. `receipts/generate.py` — deterministic (seed 42) synthetic receipts with injected fraud patterns, duplicates and bad rows; `write_csv` writes `data/receipts.csv`.
+3. `receipts/etl.py` — `extract` → `validate` (bad rows to quarantine with a reason) → `transform` (dedupe, FX to INR) → `load` (idempotent delete + insert per business date in one transaction).
+4. `airflow/dags/receipts_etl_dag.py` — the `@daily` DAG: `input_available` short-circuit → `load_partition` (calls `receipts.etl.run` for `{{ ds }}`) → `check_partition`.
+5. `spark/daily_spend.py` — local PySpark: `daily_totals` per date × currency × payer and `rolling_7d` range-window spend.
+6. `hadoop/mapper.awk` → `hadoop/reducer.awk` — Hadoop Streaming MapReduce counting receipts and totals per currency; `hadoop/run-streaming.sh` runs it in the `apache/hadoop` container.
+7. `ml/fraud.py` — `build_features` (point-in-time features) → `train` (RandomForest + metrics) → `save`/`load` with joblib.
+8. `ml/api.py` — FastAPI scorer: `POST /score` loads the saved model once, 422 on bad input, 503 when no model.
+9. `rag/qa.py` — `ReceiptIndex` (embeddings + cosine search) and `answer`: computes the total itself, lets the LLM phrase it, falls back to the computed facts if the LLM's text doesn't contain the total.
+10. `rag/llm.py` — `OpenAICompatibleClient` (Ollama `/v1`) and the deterministic `StubClient` used by tests.
+
+Which file to open for each flow:
+
+| Flow | Open, in order |
+|---|---|
+| Daily batch load into PostgreSQL | `airflow/dags/receipts_etl_dag.py` → `receipts/etl.py` (`run` → `extract` → `transform` → `load`); test `tests/test_etl.py` |
+| Spend analytics | `spark/daily_spend.py`; test `tests/test_spark.py` |
+| MapReduce per currency | `hadoop/run-streaming.sh` → `hadoop/mapper.awk` → `hadoop/reducer.awk`; test `tests/test_hadoop.py` |
+| Train the fraud model (`make train`) | `ml/fraud.py` `__main__` → `receipts/generate.py` → `receipts/etl.py` `transform` → `build_features` → `train` |
+| `POST /score` | `ml/api.py` → `ml/fraud.py` `load`; test `tests/test_ml.py` |
+| "How much did payer_012 spend …?" (RAG) | `rag/qa.py` `parse_question` → `answer` → `rag/llm.py`; test `tests/test_rag.py` |
+
 ## Skills table
 
 | Skill | Where | What it really does | Verified by |
