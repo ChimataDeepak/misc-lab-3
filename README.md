@@ -32,6 +32,21 @@ Run everything: `./run-all.sh` (or `make all`). Results of the last run: [RUN-RE
 **Data honesty:** everything is synthetic. The fraud model's near-perfect ROC-AUC shows the
 features recover patterns *I injected*; it says nothing about real-world fraud performance.
 
+## Real vs simulated
+
+| Part | Real | Simulated / not run |
+|---|---|---|
+| Data | - | All receipts are synthetic (`receipts/generate.py`, seed 42); fraud patterns, duplicates and bad rows are injected |
+| PostgreSQL | Real Postgres 16 (Testcontainers in tests, compose locally) | - |
+| Airflow | Official `apache/airflow:2.10.5` image, real tasks via `airflow dags test` twice | No long-running scheduler or webserver |
+| Spark | Real PySpark 4.2 | `local[2]` on one machine, no cluster |
+| Hadoop | Real Hadoop 3.4.1 Streaming job | Local job runner in one container (no HDFS/YARN cluster), amd64 image under emulation on arm64 |
+| ML | Real scikit-learn training and FastAPI serving | Metrics are on synthetic, injected patterns; random (not time-based) split |
+| RAG / LLM | Real Ollama run once (`qwen2.5:0.5b`, `nomic-embed-text`) | Default tests use a deterministic stub client; no hosted LLM, no vector DB |
+| CI | Workflow file exists | Never run on GitHub (branch not pushed) |
+
+Architecture, failure modes and decisions: [ARCHITECTURE.md](ARCHITECTURE.md). Per-skill notes: `learn/LEARN-*.md`.
+
 ## How I'd explain it in an interview
 
 **ETL.** "Bad rows shouldn't kill a batch, and good rows shouldn't be silently lost. Each row is

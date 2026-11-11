@@ -25,3 +25,17 @@ Hadoop ran in a single container with the local job runner, not a multi-node HDF
 Re-ran everything: ETL 6 passed (alone; 2 Testcontainers setup errors when run inside the full suite under load, pass on rerun), Spark/ML/RAG-stub/Hadoop-local passed,
 Airflow DagBag 4 passed + 2x `dags test` success with 115 rows, Hadoop Streaming counts identical, ML metrics identical,
 real Ollama test 1 passed (failed once with an HTTP error on a cold model, passed on rerun).
+
+## Secret scan (11 Nov 2026, gitleaks 8.30.1)
+
+| Scope | Command | Result |
+|---|---|---|
+| This branch's history | `gitleaks detect --source . --no-banner --log-opts="miscellaneous-3"` | 2 commits scanned, **no leaks found** |
+| Whole shared repo | `gitleaks detect --source . --no-banner` | 1062 commits scanned, leaks found: 37, none on this branch (see note) |
+
+Note: every lab worktree shares one git repository, so the plain command scans all branches. The repo-wide hits are
+31 `generic-api-key` matches in `career/job-hunt-latest.json` on the `job-hunt-tracker` and `claude/*` branches, and 6
+in misc-7's `artifacts/zap-report.md` (ZAP-scanned URLs on the local scan host, suppressed by misc-7's `.gitleaksignore`).
+History was not rewritten.
+
+Lab-only values: Postgres `receipts`/`receipts` in `docker-compose.yml`, `receipts/etl.py` and the Airflow scripts (throwaway local containers, not real credentials).
