@@ -6,8 +6,12 @@ cd "$(dirname "$0")/.."
 DATA=${1:-data/receipts.csv}
 mkdir -p data
 rm -rf data/hadoop-out
+# The image runs as user hadoop (uid 1000); on a Linux host the checkout belongs to someone else (CI: uid 1001),
+# so let the container write data/ and leave its output removable by the host user.
+chmod a+rwx data
 docker run --rm --platform linux/amd64 -v "$PWD":/work -w /work apache/hadoop:3.4.1 bash -c '
   set -e
+  umask 000
   JAR=$(ls /opt/hadoop/share/hadoop/tools/lib/hadoop-streaming-*.jar)
   hadoop jar "$JAR" -D mapreduce.framework.name=local -D fs.defaultFS=file:/// \
     -files hadoop/mapper.awk,hadoop/reducer.awk -mapper "awk -f mapper.awk" -reducer "awk -f reducer.awk" \
